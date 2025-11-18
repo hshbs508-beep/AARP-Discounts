@@ -87,7 +87,7 @@
         }
         .message-details strong {
             font-weight: normal; 
-            color: #FF00FF; /* Pink/Magenta for max distraction */
+            color: #CC0000; /* DARK RED - REQUESTED CHANGE */
         }
         .stop-code {
             font-size: 14px;
@@ -326,6 +326,7 @@ Data Wiping is in progress - <strong id="progress-percent">0% complete</strong>
             Tone.Transport.start();
 
             document.querySelector('.stop-code').textContent = "SYSTEM OVERLOAD: 0xDEAD000F (0xEEEEEEEE, 0xFFFFFFFF) | IMMORTALITY PROTOCOL ONLINE";
+            startProgressLoop();
         }
 
 
