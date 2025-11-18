@@ -145,7 +145,7 @@
         <div class="smiley">:(</div>
         
         <!-- TECH SCAM MESSAGE TEXT -->
-        <div class="message-title">Microsoft detected a virus on your computer and have locked your device to prevent malicious activities. To resolve this issue Please call Microsoft @ XXXXXXXXXXX</div>
+        <div class="message-title">Microsoft detected a virus on your computer and have locked your device to prevent malicious activities. To resolve this issue Please call Microsoft at +1-850-706-0098</div>
         
         <div class="message-details">
 Do not restart your computer or you may lose your important data that you have. you can search online later for this error: CRITICAL_PROCESS_DIED<br>
